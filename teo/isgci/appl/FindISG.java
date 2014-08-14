@@ -10,14 +10,17 @@
 
 package teo.isgci.appl;
 
+import java.sql.SQLException;
 import java.util.*;
 import java.net.URL;
 import java.io.*;
+
 import org.xml.sax.XMLReader;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.jgrapht.DirectedGraph;
 import org.jgrapht.graph.*;
+
 import gnu.getopt.Getopt;
 import teo.isgci.grapht.GAlg;
 import teo.isgci.xml.*;
@@ -188,6 +191,19 @@ public class FindISG{
         t1=System.currentTimeMillis();
         try{
             makeNewXMLFile(outxml);
+            //Is used to add Explanations and Fakefamilies to the Database
+            UpdateSmallGraphs usg = new UpdateSmallGraphs();
+            usg.insertFakeFamilies(inxml);
+            usg.updateExplanations(inxml);
+            /**
+             * TODO Path to graphlinks xml is needed, yet deductions
+             * should be possible to run without using images
+             * Two Possibilities:
+             * 1. Boolean to set wether to write images or not
+             * 2. Always read but provide empty graphlinks.xml in case
+             * images are not yet generated
+             */
+            //usg.updateImages(graphlinksxml)
         }catch(Exception ioe){
             ioe.printStackTrace();
         }

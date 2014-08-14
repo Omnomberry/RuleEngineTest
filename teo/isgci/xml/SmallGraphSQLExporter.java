@@ -1,5 +1,6 @@
 package teo.isgci.xml;
 
+import teo.isgci.appl.ISGCIResolver;
 import teo.isgci.smallgraph.Configuration;
 import teo.isgci.smallgraph.Family;
 import teo.isgci.smallgraph.Graph;
@@ -10,11 +11,13 @@ import teo.isgci.smallgraph.SmallGraph;
 import teo.isgci.smallgraph.UnionFamily;
 import teo.isgci.smallgraph.HMTGrammar.HMTGraph;
 
+import java.net.MalformedURLException;
 import java.sql.SQLException;
 import java.text.DateFormat;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.List;
+import java.util.TreeMap;
 import java.util.Vector;
 
 import org.jgrapht.DirectedGraph;
@@ -29,6 +32,7 @@ public class SmallGraphSQLExporter {
     private Integer m_hmtGramID;
     private Integer m_sgsgID;
     private Integer m_hmtFamID;
+    private TreeMap<String, String> imageMap;
 
     final static int EDGE = 1;
     final static int NONEDGE = -1;
@@ -50,6 +54,7 @@ public class SmallGraphSQLExporter {
 
         try {
             m_sql.executeSQLCommand("SET FOREIGN_KEY_CHECKS=0;");
+
             // Reset all tables that use our generated IDs
             m_sql.emptyTable("smallgraph");
             m_sql.emptyTable("sg_sg_derivation");
@@ -73,10 +78,12 @@ public class SmallGraphSQLExporter {
      * @param famil
      * @param config
      * @param incls
+     * @throws MalformedURLException
      */
     public void writeSmallGraphs(Vector smallGraphs, Vector gram,
             Vector famil, Vector config,
-            DirectedGraph<Graph, DefaultEdge> incls) {
+            DirectedGraph<Graph, DefaultEdge> incls)
+            throws MalformedURLException {
 
         Calendar cal = Calendar.getInstance();
         DateFormat df = DateFormat.getDateTimeInstance(DateFormat.FULL,
@@ -84,6 +91,9 @@ public class SmallGraphSQLExporter {
 
         System.out.println("Time when started filling the DB "
                 + "with SmallGraph DATA: " + df.format(cal.getTime()));
+
+        // Reading in imagenames for given smallgraphs from graphlinks.xml
+        readImages();
 
         System.out.println("Fill SmallGraphs");
         writeGraphs(smallGraphs);
@@ -101,6 +111,22 @@ public class SmallGraphSQLExporter {
 
         System.out.println("Time when stopped filling "
                 + "DB with SmallGraph Data: " + df.format(cal.getTime()));
+    }
+
+    private void readImages() throws MalformedURLException {
+        XMLParser xml;
+        ImageReader handler2 = new ImageReader();
+
+        Resolver loader = new ISGCIResolver("file:"
+                + System.getProperty("user.dir") + "/");
+
+        xml = new XMLParser(
+                loader.openInputSource("/Users/moritz/Documents/workspace/RuleEngine/"
+                        + "build/web/images/graphlinks.xml"), handler2,
+                loader.getEntityResolver());
+        xml.parse();
+
+        imageMap = handler2.getImageMap();
     }
 
     /**
@@ -153,8 +179,8 @@ public class SmallGraphSQLExporter {
                         + c.getName());
             }
             try {
-                m_sql.insertUpdateNewSmallgraph(name, m_sgID, link, "configuration",
-                        nodes, edges); 
+                m_sql.insertUpdateNewSmallgraph(name, m_sgID, link,
+                        "configuration", nodes, edges);
                 m_sgID++;
             } catch (SQLException e) {
                 e.printStackTrace();
@@ -188,7 +214,7 @@ public class SmallGraphSQLExporter {
 
             try {
                 m_sql.insertNewSmallgraph(coName, m_sgID, "null",
-                        "ConfComplement", null, "null");
+                        "ConfComplement", null, null);
                 m_sgID++;
             } catch (SQLException e) {
                 e.printStackTrace();
@@ -198,7 +224,7 @@ public class SmallGraphSQLExporter {
             try {
                 m_sql.insertNewSmallgraph(coName, m_sgID,
                         co.getLink() == null ? "null" : co.getLink(),
-                        "ConfComplement", null, "null");
+                        "ConfComplement", null, null);
                 m_sgID++;
             } catch (SQLException e) {
                 e.printStackTrace();
@@ -227,7 +253,7 @@ public class SmallGraphSQLExporter {
         int i, j;
 
         edge += ("<" + SmallGraphTags.EDGES + ">\n");
-        otherEdge += tag + "\n";
+        otherEdge += "<" + tag + ">\n";
         for (i = 0; i < conf.countNodes(); i++)
             for (j = i + 1; j < conf.countNodes(); j++)
                 if (conf.getEdge(i, j) == EDGE)
@@ -254,12 +280,12 @@ public class SmallGraphSQLExporter {
         String name = null;
         String grammar = null;
         String index = null;
-        String definition = "";
+        String definition = null;
         Vector<SmallGraph> smallmembers = null;
         boolean writehmtfamily = false;
 
         for (Family f : families) {
-            definition = "null";
+            definition = null;
             type = null;
             grammar = null;
             index = null;
@@ -282,8 +308,8 @@ public class SmallGraphSQLExporter {
                 if (fhmt.getGrammar() != null) {
                     writehmtfamily = true;
                     if (fhmt.getGrammar().getName() == null) {
-                        definition = definition.concat(writeGrammar(
-                                fhmt.getGrammar(), "   ", false));
+                        definition = writeGrammar(fhmt.getGrammar(), "   ",
+                                false);
                     } else {
                         grammar = fhmt.getGrammar().getName();
                         index = null;
@@ -293,17 +319,16 @@ public class SmallGraphSQLExporter {
                         else
                             index = fhmt.getIndex();
 
-                        definition = definition.concat("<"
-                                + SmallGraphTags.USEGRAMMAR + " "
+                        definition = "<" + SmallGraphTags.USEGRAMMAR + " "
                                 + SmallGraphTags.NAME + "=\"" + grammar + "\""
-                                + "/>\n");
+                                + "/>\n";
                     }
 
                 }
             }
             try {
-                m_sql.insertUpdateNewSmallgraph(name, m_sgID, link, type, null,
-                        definition); 
+                m_sql.insertUpdateNewSmallgraph(name, m_sgID, link, type,
+                        null, definition);
                 m_sgID++;
             } catch (SQLException e) {
                 e.printStackTrace();
@@ -343,7 +368,7 @@ public class SmallGraphSQLExporter {
      */
     private void writeHmtFamily(String grammar, String name, String index) {
         try {
-            m_sql.insertNewHmtFamily(m_hmtFamID, name, grammar, index); 
+            m_sql.insertNewHmtFamily(m_hmtFamID, name, grammar, index);
             m_hmtFamID++;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -365,8 +390,8 @@ public class SmallGraphSQLExporter {
 
         if (co.getLink() == null || co.getLink().equals(f.getLink())) {
             try {
-                m_sql.insertNewSmallgraph(coname, m_sgID, "null",
-                        "familyComplement", null, "null");
+                m_sql.insertNewSmallgraph(coname, m_sgID, null,
+                        "familyComplement", null, null);
                 m_sgID++;
             } catch (SQLException e) {
                 e.printStackTrace();
@@ -374,9 +399,8 @@ public class SmallGraphSQLExporter {
 
         } else {
             try {
-                m_sql.insertNewSmallgraph(coname, m_sgID,
-                        co.getLink() == null ? "null" : co.getLink(),
-                        "familyComplement", null, "null");
+                m_sql.insertNewSmallgraph(coname, m_sgID, co.getLink(),
+                        "familyComplement", null, null);
                 m_sgID++;
             } catch (SQLException e) {
                 e.printStackTrace();
@@ -406,8 +430,9 @@ public class SmallGraphSQLExporter {
         for (Vector<SmallGraph> vecInd : list) {
             if (vecInd.size() == 1) {
                 try {
-                    m_sql.insertNewSmallgraph(vecInd.firstElement().getName(),
-                            m_sgID, "null", "induced", null, "null");
+                    String name = vecInd.firstElement().getName();
+                    m_sql.insertNewSmallgraph(name, m_sgID, "null", "induced",
+                            null, null);
                     m_sgID++;
                     m_sql.insertNewSgSgDerivation(m_sgsgID, fname, vecInd
                             .firstElement().getName(), SmallGraphTags.INDUCED1);
@@ -418,8 +443,9 @@ public class SmallGraphSQLExporter {
             } else {
                 for (SmallGraph g : vecInd)
                     try {
-                        m_sql.insertNewSmallgraph(g.getName(), m_sgID, "null",
-                                "induced", null, "null");
+                        String name = g.getName();
+                        m_sql.insertNewSmallgraph(name, m_sgID, null,
+                                "induced", null, null);
                         m_sgID++;
                         m_sql.insertNewSgSgDerivation(m_sgsgID, fname,
                                 g.getName(), SmallGraphTags.INDUCED);
@@ -443,8 +469,9 @@ public class SmallGraphSQLExporter {
 
         for (SmallGraph g : list) {
             try {
-                m_sql.insertNewSmallgraph(g.getName(), m_sgID, "null",
-                        "subfamily", null, "null");
+                String name = g.getName();
+                m_sql.insertNewSmallgraph(name, m_sgID, null, "subfamily",
+                        null, null);
                 m_sgID++;
                 m_sql.insertNewSgSgDerivation(m_sgsgID, fname, g.getName(),
                         SmallGraphTags.SUBFAMILY);
@@ -471,8 +498,9 @@ public class SmallGraphSQLExporter {
 
             if (vecInd.size() == 1) {
                 try {
-                    m_sql.insertNewSmallgraph(vecInd.firstElement().getName(),
-                            m_sgID, "null", "inducedRest", null, "null");
+                    String name = vecInd.firstElement().getName();
+                    m_sql.insertNewSmallgraph(name, m_sgID, null,
+                            "inducedRest", null, null);
                     m_sgID++;
                     m_sql.insertNewSgSgDerivation(m_sgsgID, fname, vecInd
                             .firstElement().getName(),
@@ -484,8 +512,9 @@ public class SmallGraphSQLExporter {
             } else {
                 for (SmallGraph g : vecInd)
                     try {
-                        m_sql.insertNewSmallgraph(g.getName(), m_sgID, "null",
-                                "inducedRest", null, "null");
+                        String name = g.getName();
+                        m_sql.insertNewSmallgraph(name, m_sgID, null,
+                                "inducedRest", null, null);
                         m_sgID++;
                         m_sql.insertNewSgSgDerivation(m_sgsgID, fname,
                                 g.getName(), SmallGraphTags.INDUCEDREST);
@@ -509,8 +538,9 @@ public class SmallGraphSQLExporter {
 
         for (SmallGraph g : list) {
             try {
-                m_sql.insertNewSmallgraph(g.getName(), m_sgID, "null",
-                        "contains", null, "null");
+                String name = g.getName();
+                m_sql.insertNewSmallgraph(name, m_sgID, null, "contains",
+                        null, null);
                 m_sgID++;
                 m_sql.insertNewSgSgDerivation(m_sgsgID, cname, g.getName(),
                         "contains");
@@ -532,8 +562,9 @@ public class SmallGraphSQLExporter {
             String familyName) {
         for (SmallGraph g : small) {
             try {
-                m_sql.insertNewSmallgraph(g.getName(), m_sgID, "null",
-                        "smallmember", null, "null");
+                String name = g.getName();
+                m_sql.insertNewSmallgraph(name, m_sgID, null, "smallmember",
+                        null, null);
                 m_sgID++;
                 m_sql.insertNewSgSgDerivation(m_sgsgID, familyName,
                         g.getName(), "smallmember");
@@ -631,31 +662,31 @@ public class SmallGraphSQLExporter {
         grammarString += "<" + SmallGraphTags.HEAD + ">\n";
         grammarString += "<" + SmallGraphTags.NODES + " "
                 + SmallGraphTags.COUNT + "=\"" + nodes[0] + "\"/> \n";
-        grammarString += "<" + SmallGraphTags.EDGES + ">" + edges[0] + "<"
-                + SmallGraphTags.EDGES + "/>\n";
+        grammarString += "</" + SmallGraphTags.EDGES + ">" + edges[0] + "<"
+                + SmallGraphTags.EDGES + ">\n";
         grammarString += "<" + SmallGraphTags.ATTACHMENT + ">"
-                + attachments[0] + "<" + SmallGraphTags.ATTACHMENT + "/>\n";
-        grammarString += "<" + SmallGraphTags.HEAD + "/>\n";
+                + attachments[0] + "</" + SmallGraphTags.ATTACHMENT + ">\n";
+        grammarString += "</" + SmallGraphTags.HEAD + ">\n";
 
         grammarString += "<" + SmallGraphTags.MID + ">\n";
         grammarString += "<" + SmallGraphTags.NODES + " "
                 + SmallGraphTags.COUNT + "=\"" + nodes[1] + "\"/> \n";
-        grammarString += "<" + SmallGraphTags.EDGES + ">" + edges[1] + "<"
-                + SmallGraphTags.EDGES + "/>\n";
+        grammarString += "</" + SmallGraphTags.EDGES + ">" + edges[1] + "<"
+                + SmallGraphTags.EDGES + ">\n";
         grammarString += "<" + SmallGraphTags.EXTENSION + ">" + extensions[0]
-                + "<" + SmallGraphTags.EXTENSION + "/>\n";
+                + "</" + SmallGraphTags.EXTENSION + ">\n";
         grammarString += "<" + SmallGraphTags.ATTACHMENT + ">"
-                + attachments[0] + "<" + SmallGraphTags.ATTACHMENT + "/>\n";
-        grammarString += "<" + SmallGraphTags.MID + "/>\n";
+                + attachments[0] + "</" + SmallGraphTags.ATTACHMENT + ">\n";
+        grammarString += "</" + SmallGraphTags.MID + ">\n";
 
         grammarString += "<" + SmallGraphTags.TAIL + ">\n";
         grammarString += "<" + SmallGraphTags.NODES + " "
                 + SmallGraphTags.COUNT + "=\"" + nodes[2] + "\"/> \n";
-        grammarString += "<" + SmallGraphTags.EDGES + ">" + edges[2] + "<"
-                + SmallGraphTags.EDGES + "/>\n";
+        grammarString += "</" + SmallGraphTags.EDGES + ">" + edges[2] + "<"
+                + SmallGraphTags.EDGES + ">\n";
         grammarString += "<" + SmallGraphTags.EXTENSION + ">" + extensions[1]
                 + "<" + SmallGraphTags.EXTENSION + "/>\n";
-        grammarString += "<" + SmallGraphTags.TAIL + "/>\n";
+        grammarString += "</" + SmallGraphTags.TAIL + ">\n";
 
         grammarString += "<" + SmallGraphTags.HMTGRAMMAR + "/>\n";
 
@@ -706,25 +737,24 @@ public class SmallGraphSQLExporter {
 
             String smallgraphName = g.getName();
             String SmallGraphType = "SimpleGraph";
-
             int nodes = g.countNodes();
 
             String definition = writeEdges(g, "");
 
             String link = g.getLink() == null ? "null" : g.getLink();
 
-                try {
-                    m_sql.insertUpdateNewSmallgraph(smallgraphName, m_sgID, link,
-                            SmallGraphType, nodes, definition);
+            try {
+                m_sql.insertUpdateNewSmallgraph(smallgraphName, m_sgID, link,
+                        SmallGraphType, nodes, definition);
 
                 m_sgID++;
 
                 writeAliases(g, smallgraphName);
 
                 writeGraphComplement(g, smallgraphName);
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                } 
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
         }
 
     }
@@ -791,21 +821,21 @@ public class SmallGraphSQLExporter {
                 && (names.size() == 1 || co.getName() == g.getName())) {
             complname = co.getName();
             try {
-                m_sql.insertNewSmallgraph(complname, m_sgID, "null",
-                        "complement", null, "null");
+                m_sql.insertNewSmallgraph(complname, m_sgID, null,
+                        "complement", null, null);
                 m_sgID++;
             } catch (SQLException e) {
                 e.printStackTrace();
             }
         } else {
-            String link = "null";
+            String link = null;
             complname = co.getName();
             if (co.getLink() != null)
                 link = (co.getLink());
 
             try {
                 m_sql.insertNewSmallgraph(complname, m_sgID, link,
-                        "complement", null, "null");
+                        "complement", null, null);
                 m_sgID++;
             } catch (SQLException e) {
                 e.printStackTrace();
