@@ -64,38 +64,41 @@ public class ISGCIWriter {
             Collection<AbstractRelation> relations,
             Map<GraphClass,Set<GraphClass> > complementAnn,
             String xmldecl) throws SAXException {
-			
-		/*Write to the database only if its webmode and if DB credentials are set
-		  For example for an XAMPP version with no password set and db name "Spectre":
-		  String databaseAdress = "jdbc:mySQL://localhost/Spectre";
-		  String databaseAccountName = "root";
-		  String databaseAccountPassword = ""; 
-		*/
-		if(mode == MODE_WEB){
-			String databaseAdress = null;
-			String databaseAccountName = null;
-			String databaseAccountPassword = null;
-			try {
-				if((databaseAdress != null) && (databaseAccountName != null) && (databaseAccountPassword != null))
-				{
-					SQLWriter s = new SQLWriter(databaseAdress, databaseAccountName, databaseAccountPassword, "", false);
-					SQLExporter exp = new SQLExporter(s, SQLExporter.MODE_WEB);
-					exp.writeISGCIDocument(g, problems, relations, complementAnn);				
-				}
-			} catch (SQLException e) {
-				System.out.println("Problems with sql");
-				e.printStackTrace();
-			} catch (IllegalArgumentException e) {
-				System.out.println("Problems with property/complexity tables");
-				e.printStackTrace();
-			} catch (IllegalAccessException e) {
-				System.out.println("Problems with property/complexity tables");
-				e.printStackTrace();
-			}
-    	}
-			
-			
-        TreeMap<String,GraphClass> names = null;
+
+        /*
+         * Write to the database only if its webmode and if DB credentials are
+         * set For example for an XAMPP version with no password set and db
+         * name "Spectre": String databaseAdress =
+         * "jdbc:mySQL://localhost/Spectre"; String databaseAccountName =
+         * "root"; String databaseAccountPassword = "";
+         */
+        if (mode == MODE_WEB) {
+            String databaseAdress = null;
+            String databaseAccountName = null;
+            String databaseAccountPassword = null;
+            try {
+                if ((databaseAdress != null) && (databaseAccountName != null)
+                        && (databaseAccountPassword != null)) {
+                    SQLWriter s = new SQLWriter(databaseAdress,
+                            databaseAccountName, databaseAccountPassword, "",
+                            false);
+                    SQLExporter exp = new SQLExporter(s, SQLExporter.MODE_WEB);
+                    exp.writeISGCIDocument(g, problems, relations,
+                            complementAnn);
+                }
+            } catch (SQLException e) {
+                System.out.println("Problems with sql");
+                e.printStackTrace();
+            } catch (IllegalArgumentException e) {
+                System.out.println("Problems with property/complexity tables");
+                e.printStackTrace();
+            } catch (IllegalAccessException e) {
+                System.out.println("Problems with property/complexity tables");
+                e.printStackTrace();
+            }
+        }
+
+        TreeMap<String, GraphClass> names = null;
         boolean sortbyname =  mode == MODE_WEB || mode == MODE_SAGE; 
 
          if (sortbyname) {
